@@ -1,21 +1,59 @@
 pragma solidity 0.8.4; //Do not change the solidity version as it negativly impacts submission grading
 // SPDX-License-Identifier: MIT
 
-// import "@openzeppelin/contracts/access/Ownable.sol";
-import "./YourToken.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {YourToken} from "./YourToken.sol";
 
-contract Vendor {
-  // event BuyTokens(address buyer, uint256 amountOfETH, uint256 amountOfTokens);
+contract Vendor is Ownable {
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    event BuyTokens(address buyer, uint256 amountOfETH, uint256 amountOfTokens);
 
-  YourToken public yourToken;
+    /*//////////////////////////////////////////////////////////////
+                               FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+    YourToken public yourToken;
 
-  constructor(address tokenAddress) {
-    yourToken = YourToken(tokenAddress);
-  }
+    uint256 public constant TOKENS_PER_ETH = 100;
 
-  // ToDo: create a payable buyTokens() function:
+    constructor(address tokenAddress) {
+        yourToken = YourToken(tokenAddress);
+    }
 
-  // ToDo: create a withdraw() function that lets the owner withdraw ETH
+    /*//////////////////////////////////////////////////////////////
+                            PUBLIC FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+    function buyTokens() public payable {
+        require(msg.value > 0, "More ETH required");
 
-  // ToDo: create a sellTokens(uint256 _amount) function:
-}
+        uint256 amountOfTokens = msg.value * TOKENS_PER_ETH;
+        require(yourToken.balanceOf(address(this)) >= amountOfTokens, "Not enough tokens");
+
+        bool success = yourToken.transfer(msg.sender, amountOfTokens);
+        require(success, "Transfer failed");
+
+        emit BuyTokens(msg.sender, msg.value, amountOfTokens);
+    }
+
+
+    function withdraw() public onlyOwner {
+        payable(owner()).transfer(address(this).balance);
+    }
+
+
+    function sellTokens(uint256 _amount) public {
+        uint256 theAmount = _amount / TOKENS_PER_ETH;
+        require(address(this).balance >= theAmount, "Insufficient ETH balance");
+
+        bool success = yourToken.transferFrom(msg.sender, address(this), _amount);
+        require(success, "Transfer failed");
+
+        (bool sent,) = msg.sender.call{value: theAmount}("");
+        require(sent, "Failed to send ETH");
+    }
+
+
+    receive() external payable {}
+
+} 
